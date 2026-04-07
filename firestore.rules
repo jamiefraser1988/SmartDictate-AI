@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (uid)
+    // Fields:
+    //   - uid: string (required) - Unique user ID
+    //   - email: string (required, email format) - User's email address
+    //   - displayName: string (optional) - User's display name
+    //   - photoURL: string (optional) - URL to user's profile photo
+    //   - createdAt: string (optional, date-time format) - When the user account was created
+    //
+    // Collection: history
+    // Document ID: itemId
+    // Fields:
+    //   - id: string (required) - Unique ID for the history item
+    //   - uid: string (required) - ID of the user who owns this item
+    //   - timestamp: number (required) - When the item was created
+    //   - input: string (required) - The original input text
+    //   - output: string (required) - The transformed output text
+    //   - format: string (required, enum: ['transcript', 'minutes', 'tasks', 'email']) - The transformation format used
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (data.get('displayName', '') is string) &&
+             (data.get('photoURL', '') is string);
+    }
+
+    function isValidHistoryItem(data) {
+      return data.keys().hasAll(['id', 'uid', 'timestamp', 'input', 'output', 'format']) &&
+             data.id is string &&
+             data.uid == request.auth.uid &&
+             data.timestamp is number &&
+             data.input is string &&
+             data.output is string &&
+             data.format in ['transcript', 'minutes', 'tasks', 'email'] &&
+             data.input.size() < 50000 &&
+             data.output.size() < 50000;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && uidNotModified();
+      allow delete: if false; // Users cannot delete their profiles
+    }
+
+    match /history/{itemId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && isValidHistoryItem(request.resource.data);
+      allow update: if false; // History items are immutable
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+  }
+}

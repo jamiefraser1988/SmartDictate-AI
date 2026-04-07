@@ -1,0 +1,7 @@
+{
+  "name": "SmartDictate AI",
+  "description": "Transform your rough voice notes and messy thoughts into polished meeting minutes, task lists, and professional emails using Gemini AI.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
