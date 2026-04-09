@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: transcribe
+    description: Audio transcription and AI processing
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /transcribe:
+    post:
+      operationId: transcribeAudio
+      tags: [transcribe]
+      summary: Transcribe audio and generate AI summary
+      description: Accepts base64-encoded audio, transcribes it with Gemini, and returns transcript, summary, and action items
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranscribeRequest"
+      responses:
+        "200":
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    TranscribeRequest:
+      type: object
+      properties:
+        audioBase64:
+          type: string
+          description: Base64-encoded audio data
+        mimeType:
+          type: string
+          description: MIME type of the audio (e.g. audio/m4a, audio/mp4, audio/3gp)
+        duration:
+          type: number
+          description: Duration of the recording in seconds
+      required:
+        - audioBase64
+        - mimeType
+    TranscribeResult:
+      type: object
+      properties:
+        transcript:
+          type: string
+          description: Full transcription of the audio
+        summary:
+          type: string
+          description: AI-generated summary of the recording
+        actionItems:
+          type: array
+          items:
+            type: string
+          description: List of extracted action items
+      required:
+        - transcript
+        - summary
+        - actionItems
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
